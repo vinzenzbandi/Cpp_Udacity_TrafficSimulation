@@ -4,7 +4,6 @@
 
 /* Implementation of class "MessageQueue" */
 
-/* 
 template <typename T>
 T MessageQueue<T>::receive()
 {
@@ -18,11 +17,12 @@ void MessageQueue<T>::send(T &&msg)
 {
     // FP.4a : The method send should use the mechanisms std::lock_guard<std::mutex> 
     // as well as _condition.notify_one() to add a new message to the queue and afterwards send a notification.
+    lock_guard<mutex> uLock(_mutex);
+    _queue.push_back(move(msg));
+    _condition.notify_one();
 }
-*/
 
 /* Implementation of class "TrafficLight" */
-
 
 TrafficLight::TrafficLight()
 {
@@ -62,15 +62,11 @@ void TrafficLight::cycleThroughPhases()
         timeElapsed++;
         if (timeElapsed >= waitTime)
         {
-            if (_currentPhase ==  green)
-            {
-                _currentPhase = red;
-            }
-            else
-            {
-                _currentPhase = green;
-            }
-            // TODO: Send update method to message queue
+            _currentPhase = _currentPhase == red ? green : red;
+            auto sentFtr = async(launch::async, &MessageQueue<TrafficLightPhase>::send, &_phaseQueue, move(_currentPhase));
+            
+            sentFtr.wait();
+
             timeElapsed = 0;
             waitTime = rand() % 2000 + 4000;
         }
